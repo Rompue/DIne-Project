@@ -1,0 +1,230 @@
+---
+title: "Get and Clean Data"
+author: "Kun Peng"
+date: "August 18, 2015"
+output: html_document
+---
+
+*This is an R markdown file to record all work I down in the “Get and Clean Data” process.*
+
+
+##Step 1
+First, I found the website addresses that store the data I need. The initial idea was to write some fuction or code to download the data automatically but after trying many different languages I failed and gave up. Then I decided to copy those data manually.
+
+The best code I write for downloading the data automatically in Python (which was wrong). 
+```{r, eval=FALSE}
+# -*- coding: utf-8 -*-
+
+import urllib2
+import cookielib
+import httplib
+from lxml import html
+import csv
+import time
+
+def parserHtml(html2, html3):
+    dom = html.document_fromstring(html2)
+    elements = dom.find_class('dropdown-toggle')
+    name = elements[1].text
+
+    dom = html.document_fromstring(html3)
+    table = dom.find_class('table table-striped')
+
+    head = list()
+    result = list()
+    row = 1
+
+    for e in table[0]:
+        trs = [t for t in e]
+        th = list()
+        for h in trs:
+           th = [i for i in h]
+        te = [h for h in th]
+        if len(te) > 0:
+            tmp0 = '-' if te[0].text == None else te[0].text.encode('gbk').lstrip().rstrip()
+            tmp1 = '-' if te[1].text == None else te[1].text.encode('gbk').lstrip().rstrip()
+            tmp2 = '-' if te[2].text == None else te[2].text.encode('gbk').lstrip().rstrip()
+            tmp3 = '-' if te[3].text == None else te[3].text.encode('gbk').lstrip().rstrip()
+            if row % 2 == 0:
+                result.append(tmp0)
+                result.append(tmp1)
+                result.append(tmp2)
+                result.append(tmp3)
+            else:
+                head.append(tmp0)
+                head.append(tmp0+(u'评价'.encode('gbk')))
+                head.append(tmp2)
+                head.append(tmp2+(u'评价'.encode('gbk')))
+            row = row+1
+
+    return name.encode('gbk').lstrip().rstrip(), head, result
+def getContent(url,number, writer, num):
+    #generate cookie
+    httplib.HTTPConnection.debuglevel = 1
+    cookie = cookielib.CookieJar()
+    #generate a nopener to use cookiejar
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie), urllib2.HTTPHandler)
+
+    #construct headers and simulate web browser
+    headers = {'Connection':'Keep-Alive',
+         'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+         'User-Agent':'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.66 Safari/537.36',
+        'Accept-Language' :"zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3",
+        'Accept-Encoding':"gzip, deflate",
+         'Host':'202.99.223.203:4001'}
+    url = url + number + 'A'
+    req = urllib2.Request(url, headers=headers)
+
+    html1 = opener.open(req).read()
+
+    url2 = 'http://202.99.223.203:4001/Health'
+    req2 = urllib2.Request(url2, headers=headers)
+    html2 = opener.open(req2).read()
+    html2 = html2.decode('utf-8')
+    url3 = 'http://202.99.223.203:4001/Health/PeInfoPartial?personCode=13120001020'+number
+
+
+    req3 = urllib2.Request(url3, headers=headers)
+    #open website and login 
+    result2 = opener.open(req3)
+    html3 = result2.read().decode('utf-8')
+
+    name, head , result = parserHtml(html2, html3)
+
+    save_csv(name, head, result, writer, num)
+
+def save_csv(name, head, result, writer, num):
+    head.insert(0,u'姓名'.encode('gbk') )
+    result.insert(0, name)
+    if num == 1:
+        writer.writerow(head)
+    writer.writerow(result)
+
+if __name__ == '__main__':
+    url = 'http://202.99.223.203:4001/Base/Login?stuno=13120001020'
+    writer = csv.writer(file('e:\jiacaiqin.csv', 'wb'))
+    for i in range(1, 1000):
+        print i
+        try:
+            getContent(url, str(i).zfill(3),  writer, i)
+        except urllib2.URLError,e:
+            continue
+        except IndexError:
+            pass
+        if i%20 == 0:
+            time.sleep(10)
+
+```
+Get data manully
+
+First I generate a file which contains all website addresses.
+```{r, echo = T, eval = F, results='hide'}
+        websiteaddress <- as.data.frame(rep(NA, 699))         
+        for (i in 92:99){
+                 websiteaddress[i,1] <- paste("http://202.99.223.203:4001/Base/Login?stuno=131200010200",as.character(i),"A",sep = "")
+}
+        for (i in 100:699){
+                websiteaddress[i,1] <-                         paste("http://202.99.223.203:4001/Base/Login?stuno=13120001020",as.character(i),"A",sep = "")
+}
+        websiteaddress <- websiteaddress[92:699,]         
+        dir.create(path = "./data/websiteaddress")         
+        write.csv(websiteaddress,"./data/websiteaddress/websiteaddress.csv")         
+#Then open the csv file and delete the first row and fiste column (which contains index and a colname)
+```
+
+```{r,echo=T, eval=T}
+        setwd("C:/Users/l/Desktop/Rdir")
+        temp <- read.csv("./data/websiteaddress/websiteaddress.csv")
+        head(temp)
+```
+Then use Chrome open these websites and direct to right place in these website to download the data manually.
+
+Chrome Version:44.0.2403.130 m The extension used to open a set of websites in one time:Tab-Snap 1.2.9 ID:ajjloplcjllkammemhenacfjcccockde
+
+After opening every website, I click the “就餐信息(Dining information) - 学生就餐信息(Student Dining List” button on the leftsidebar, and then set the “开始日期(Beginning Time)” to any time before “2014-09-01” (“结束日期”(Ending Time) was set to “2015-08-17” by default).
+
+Copy the whole html content of each address in the websites file to an excel file Rawdataversion1.xls in data directoryin different sheets.
+
+Continually, I write a VBA modul in the Rawdataversion1.xls to save every sheet in it to an independente csv file.
+
+VBA code:
+```{r, eval = F, echo = T, results='hide'}
+Sub ExcelToCsvMain()
+'Get the numbers of sheets
+   Dim i, sheet_count, sheet_name As String
+   sheet_count = Sheets.Count
+   For i = 1 To sheet_count
+       sheet_name = Sheets(i).Name
+       Sheets(sheet_name).Select
+       Call ExportSelectionToCSV
+   Next
+   Sheets(1).Select
+End Sub
+Function ExportSelectionToCSV()
+   Dim wks As Worksheet
+   Dim newWks As Worksheet
+   Dim bookPath As String
+   bookPath = ThisWorkbook.Path
+   bookPath = bookPath + "\csvfiles\"
+   
+   If Dir(bookPath) = "" Then
+       MkDir bookPath
+   End If
+   
+   For Each wks In ActiveWindow.SelectedSheets
+       wks.Copy 'to a new workbook
+       Set newWks = ActiveSheet
+       With newWks
+           Application.DisplayAlerts = False
+           .Parent.SaveAs Filename:=bookPath & .Name, _
+                FileFormat:=xlCSV
+           Application.DisplayAlerts = True
+           .Parent.Close savechanges:=False
+       End With
+   Next wks
+End Function
+#'Run the modul and it will save all csv files to "csvfiles" directory. 
+#'Names of these sheets will be: "Sheet1.csv", "Sheet2.csv","Sheet3.csv", etc.
+```
+
+##Step 2
+
+```{r,echo=T, results='hide', eval=FALSE}
+stuname <- as.data.frame(rep(NA, 500))
+
+for (i in 1:284){
+        filename <- paste("./data/csvfiles/","Sheet", as.character(i), ".csv", sep = "")
+        if(file.exists(filename)){
+        temp <- read.csv(file = filename, skip = 6)
+        stuname[i,1] <- as.character(temp[2,1])
+        temp <- temp[11:((nrow(temp)-2)),]
+        temp <- temp[,2:5]
+        names(temp) <- c("Dine", "Share", "Type","Date")
+        temp[,2] <- as.numeric(temp[,2])
+        temp[,3] <- as.factor(temp[,3])
+        temp[,4] <- as.Date(temp[,4], format = "%m/%d/%Y")
+        write.csv(temp, paste("./data/tidydata/",as.character(i), ".csv", sep = ""))}
+}
+
+stuname$Index <- c(1:length(stuname[,1]))
+stunamecheck <- stuname[!is.na(stuname[,1]),]
+stunamecheck[1,1] <- "student"
+stunamecheck <- stunamecheck[stunamecheck[,1] != "",]
+stunamecheck
+library(dplyr)
+stunamecheck[,1] <- gsub("学生： ","",stunamecheck[,1])
+stunamecheck$number <- c(1:length(stunamecheck[,1]))
+
+dir.create("./data/finaldata")
+
+count = 0
+for (i in 1:284){
+        filename <- paste("./data/tidydata/", as.character(i), ".csv", sep = "")
+        if(file.exists(filename)){
+                temp <- read.csv(filename)
+                count = count + 1
+                pathname <- paste("./data/finaldata/", as.character(count), ".csv", sep = "")
+                write.csv(temp, pathname)
+        }
+}
+```
